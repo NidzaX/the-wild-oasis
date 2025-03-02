@@ -11,13 +11,18 @@ export async function getCabins() {
 }
 
 export async function createEditCabin(newCabin, id) {
+  // Check if the image is already a URL
   const hasImagePath = newCabin.image?.startsWith?.(supabaseUrl);
 
+  // Keep the existing URL if it's already a full path
   const imageName = hasImagePath
-    ? newCabin.image
+    ? newCabin.image // Keep the existing URL
     : `${Math.random()}-${newCabin.image.name}`.replaceAll("/", "");
 
-  const imagePath = `${supabaseUrl}/storage/v1/object/public/cabin-images/${imageName}`;
+  // Only prepend supabaseUrl if it's a new image (not a URL)
+  const imagePath = hasImagePath
+    ? newCabin.image // Keep the original image URL
+    : `${supabaseUrl}/storage/v1/object/public/cabin-images/${imageName}`;
 
   let query = supabase.from("cabins");
 
@@ -36,16 +41,19 @@ export async function createEditCabin(newCabin, id) {
     throw new Error("Cabins could not be created");
   }
 
-  const { error: storageError } = await supabase.storage
-    .from("cabin-images")
-    .upload(imageName, newCabin.image);
+  // Upload only if it's a new image (not an existing URL)
+  if (!hasImagePath) {
+    const { error: storageError } = await supabase.storage
+      .from("cabin-images")
+      .upload(imageName, newCabin.image);
 
-  if (storageError) {
-    await supabase.from("cabins").delete().eq("id", data.id);
-    console.log(storageError);
-    throw new Error(
-      "Cabin image could not be uploaded and the cabin was not created"
-    );
+    if (storageError) {
+      await supabase.from("cabins").delete().eq("id", data.id);
+      console.log(storageError);
+      throw new Error(
+        "Cabin image could not be uploaded and the cabin was not created"
+      );
+    }
   }
 
   return data;
